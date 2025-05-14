@@ -1,0 +1,569 @@
+Arduino Code
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+#define DHTPIN 2
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define BUZZER_PIN 9
+#define RELAY_PIN 8  // Relay control pin
+void setup() {
+  lcd.init();
+  lcd.backlight();
+  dht.begin();
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);  // Fan OFF by default
+  lcd.setCursor(0, 0);
+  lcd.print(" Temp Monitor ");
+  lcd.setCursor(0, 1);
+  lcd.print(" Starting... ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temp);
+  lcd.print(" C   ");
+  lcd.setCursor(0, 1);
+  lcd.print("Hum:  ");
+  lcd.print(hum);
+  lcd.print(" %   ");
+  // Buzzer logic
+  if (temp > 20 || temp < 15) {
+    digitalWrite(BUZZER_PIN, HIGH);
+  } else {
+    digitalWrite(BUZZER_PIN, LOW);
+  }
+  // Fan control via relay
+  if (temp > 35) {
+    digitalWrite(RELAY_PIN, HIGH);  // Turn fan ON
+  } else {
+    digitalWrite(RELAY_PIN, LOW);   // Turn fan OFF
+  }
+  delay(2000);
+}
+
+
+
+
+HTML FILE
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Thermostat Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1 class="cool-heading">🌡 Smart Thermostat Dashboard</h1>
+
+    <div class="controls">
+      <button id="simulateBtn">Simulate Temperature</button>
+      <button id="resetAutoBtn">Reset to Auto Mode</button>
+      <label class="theme-switch">
+        <input type="checkbox" id="themeToggle">
+        <span>🌞/🌙</span>
+      </label>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h3>Current Temperature</h3>
+        <p id="temp">-- °C</p>
+      </div>
+      <div class="card">
+        <h3>Thermostat Status</h3>
+        <p id="status">--</p>
+      </div>
+      <div class="card">
+        <h3>Manual Fan Control</h3>
+        <label class="switch">
+          <input type="checkbox" id="fanToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <canvas id="tempChart" width="600" height="300"></canvas>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+JAVASCRIPT FILE
+let temperature = 25.5;
+let manualMode = false;
+
+const tempElement = document.getElementById("temp");
+const statusElement = document.getElementById("status");
+const simulateBtn = document.getElementById("simulateBtn");
+const resetAutoBtn = document.getElementById("resetAutoBtn");
+const themeToggle = document.getElementById("themeToggle");
+const fanToggle = document.getElementById("fanToggle");
+
+function updateUI() {
+  tempElement.textContent = ${temperature.toFixed(1)} °C;
+
+  if (!manualMode) {
+    const autoStatus = temperature > 25 ? "ON" : "OFF";
+    statusElement.textContent = autoStatus;
+    fanToggle.checked = autoStatus === "ON";
+  }
+}
+
+function addToChart(temp) {
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  tempChart.data.labels.push(time);
+  tempChart.data.datasets[0].data.push(parseFloat(temp));
+  if (tempChart.data.labels.length > 10) {
+    tempChart.data.labels.shift();
+    tempChart.data.datasets[0].data.shift();
+  }
+  tempChart.update();
+}
+
+simulateBtn.addEventListener("click", () => {
+  simulateBtn.disabled = true;a
+  simulateBtn.textContent = "Simulating...";
+  setInterval(() => {
+    const variation = (Math.random() - 0.5) * 2;
+    temperature += variation;
+    updateUI();
+    addToChart(temperature.toFixed(1));
+  }, 3000);
+});
+
+resetAutoBtn.addEventListener("click", () => {
+  manualMode = false;
+  updateUI();
+});
+
+fanToggle.addEventListener("change", () => {
+  manualMode = true;
+  const isOn = fanToggle.checked;
+  statusElement.textContent = isOn ? "ON" : "OFF";
+});
+
+themeToggle.addEventListener("change", (e) => {
+  document.body.classList.toggle("dark", e.target.checked);
+});
+
+const ctx = document.getElementById("tempChart").getContext("2d");
+
+const tempChart = new Chart(ctx, {
+  type: "line",
+  data: {
+    labels: ["9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM"],
+    datasets: [{
+      label: "Temperature (°C)",
+      data: [24, 24.5, 25, 26, 25.5, 25.2],
+      fill: true,
+      backgroundColor: "rgba(0, 123, 255, 0.1)",
+      borderColor: "#0077b6",
+      tension: 0.3,
+      pointBackgroundColor: "#0077b6",
+      pointRadius: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        display: true,
+        labels: {
+          color: "#333",
+          font: {
+            size: 14
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: "#333"
+        }
+      },
+      y: {
+        ticks: {
+          color: "#333"
+        },
+        suggestedMin: 20,
+        suggestedMax: 30
+      }
+    }
+  }
+});
+
+updateUI();
+
+CSS FILE
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f0f4f8;
+  margin: 0;
+  padding: 0;
+  transition: background 0.3s, color 0.3s;
+}
+
+.container {
+  padding: 2rem;
+  text-align: center;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.cards {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  min-width: 200px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.card h3 {
+  margin-bottom: 0.5rem;
+  color: #0077b6;
+}
+
+.card p {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #023e8a;
+}
+
+.controls {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  align-items: center;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  background-color: #0077b6;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background-color: #023e8a;
+}
+
+.theme-switch input {
+  display: none;
+}
+
+.theme-switch span {
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 26px; width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #0077b6;
+}
+
+input:checked + .slider::before {
+  transform: translateX(26px);
+}
+
+/* Dark Mode */
+body.dark {
+  background-color: #1e1e1e;
+  color: white;
+}
+
+body.dark .card {
+  background-color: #2c2c2c;
+}
+
+body.dark h1,
+body.dark .card h3,
+body.dark .card p {
+  color: #ffffff;
+}
+
+.cool-heading {
+  font-size: 2.8rem;
+  background: linear-gradient(90deg, #023e8a, #0077b6, #03045e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: bounceIn 1s ease;
+  position: relative;
+  display: inline-block;
+}
+
+.cool-heading::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(to right, #023e8a, #0077b6);
+  left: 0;
+  bottom: -8px;
+  border-radius: 2px;
+  transition: transform 0.3s ease;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.cool-heading:hover::after {
+  transform: scaleX(1);
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+ESP CODE
+#include <ESP8266WiFi.h>
+#include <ESPAsyncWebServer.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+// Pin definitions
+#define DHTPIN D4         // GPIO2
+#define DHTTYPE DHT11
+#define BUZZER_PIN D6     // GPIO12
+#define RELAY_PIN D5      // GPIO14
+
+// Objects
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+AsyncWebServer server(80);
+
+// WiFi credentials
+const char* ssid = "UDAY4691";
+const char* password = "uday1245";
+
+float temperature = 0.0;
+float humidity = 0.0;
+
+bool fanOn = false;
+bool buzzerOn = false;
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize components
+  dht.begin();
+  delay(2000);  // Let DHT sensor stabilize
+
+  lcd.init();
+  lcd.backlight();
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(RELAY_PIN, LOW);
+
+  // Connect to WiFi
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting WiFi");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected. IP: ");
+  Serial.println(WiFi.localIP());
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("IP:");
+  lcd.setCursor(0, 1);
+  lcd.print(WiFi.localIP());
+
+  // Setup web server
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<title>Smart Thermostat</title><style>button{padding:15px;margin:10px;font-size:18px;}</style></head><body>";
+    html += "<h2>Smart Thermostat</h2>";
+    html += "<p>Temp: " + (isnan(temperature) ? String("Error") : String(temperature) + " °C") + "</p>";
+    html += "<p>Humidity: " + (isnan(humidity) ? String("Error") : String(humidity) + " %") + "</p>";
+    html += "<button onclick=\"fetch('/fan/on')\">Fan ON</button>";
+    html += "<button onclick=\"fetch('/fan/off')\">Fan OFF</button><br>";
+    html += "<button onclick=\"fetch('/buzzer/on')\">Buzzer ON</button>";
+    html += "<button onclick=\"fetch('/buzzer/off')\">Buzzer OFF</button>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  server.on("/fan/on", HTTP_GET, [](AsyncWebServerRequest *request){
+    fanOn = true;
+    digitalWrite(RELAY_PIN, HIGH);
+    request->send(200, "text/plain", "Fan ON");
+  });
+
+  server.on("/fan/off", HTTP_GET, [](AsyncWebServerRequest *request){
+    fanOn = false;
+    digitalWrite(RELAY_PIN, LOW);
+    request->send(200, "text/plain", "Fan OFF");
+  });
+
+  server.on("/buzzer/on", HTTP_GET, [](AsyncWebServerRequest *request){
+    buzzerOn = true;
+    digitalWrite(BUZZER_PIN, HIGH);
+    request->send(200, "text/plain", "Buzzer ON");
+  });
+
+  server.on("/buzzer/off", HTTP_GET, [](AsyncWebServerRequest *request){
+    buzzerOn = false;
+    digitalWrite(BUZZER_PIN, LOW);
+    request->send(200, "text/plain", "Buzzer OFF");
+  });
+
+  server.begin();
+}
+
+void loop() {
+  // Read DHT data
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C | Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+
+  // Display on LCD
+  lcd.setCursor(0, 0);
+  if (isnan(temperature)) {
+    lcd.print("Temp: Error     ");
+  } else {
+    lcd.print("Temp: ");
+    lcd.print(temperature);
+    lcd.print(" C   ");
+  }
+
+  lcd.setCursor(0, 1);
+  if (isnan(humidity)) {
+    lcd.print("Hum: Error     ");
+  } else {
+    lcd.print("Hum: ");
+    lcd.print(humidity);
+    lcd.print(" %   ");
+  }
+
+  // Auto fan control
+  if (!fanOn && !isnan(temperature) && temperature > 35) {
+    digitalWrite(RELAY_PIN, HIGH);
+  } else if (!fanOn) {
+    digitalWrite(RELAY_PIN, LOW);
+  }
+
+  // Auto buzzer control
+  if (!buzzerOn && !isnan(temperature) && (temperature > 20 || temperature < 15)) {
+    digitalWrite(BUZZER_PIN, HIGH);
+  } else if (!buzzerOn) {
+    digitalWrite(BUZZER_PIN, LOW);
+  }
+
+  delay(2000);
+}
+
+
